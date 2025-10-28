@@ -1,4 +1,4 @@
-# audit_modules/audit_ios15.py
+# audit_modules/audit_ios17.py
 
 import re
 from report_modules.models import Finding
@@ -29,7 +29,7 @@ def _create_finding(func, status: str, description: str = ""):
         remediation=func.remediation
     )
 
-# --- SAMPLE CIS IOS 15 CHECKS ---
+# --- SAMPLE CIS IOS XE 17 CHECKS ---
 
 @register_check(
     cis_id="1.1.1", level=1, issue="Enable 'aaa new-model'", 
@@ -42,22 +42,17 @@ def check_aaa_new_model(config: str) -> Finding:
                            description="AAA New Model is not enabled, compromising authentication framework.")
 
 @register_check(
-    cis_id="1.2.2", level=1, issue="Set 'enable secret' (Type 5/9 preferred)", 
-    risk="Critical", remediation="Set 'enable secret <password>' globally. Avoid 'enable password'."
+    cis_id="1.3.1", level=1, issue="Set 'username <user> privilege 15 secret'", 
+    risk="High", remediation="Use 'username ... secret' and privilege levels instead of local-user database."
 )
-def check_enable_secret(config: str) -> Finding:
-    if re.search(r"^\s*enable\s+secret\s+5|9\s+", config, re.MULTILINE):
-        return _create_finding(check_enable_secret, "Pass")
-    
-    if re.search(r"^\s*enable\s+password\s+", config, re.MULTILINE):
-        return _create_finding(check_enable_secret, "Fail", 
-                               description="Legacy 'enable password' found (clear text or weak hash).")
-    
-    return _create_finding(check_enable_secret, "Fail",
-                           description="'enable secret' is not configured.")
-
-def run_cis_cisco_ios_15_assessment(config_content: str) -> List[Finding]:
-    """Runs all registered IOS 15 checks."""
+def check_admin_user_secret(config: str) -> Finding:
+    if re.search(r"^\s*username\s+\S+\s+privilege\s+15\s+secret\s+5|9\s+", config, re.MULTILINE):
+        return _create_finding(check_admin_user_secret, "Pass")
+    return _create_finding(check_admin_user_secret, "Manual", 
+                           description="Check for secure local user definition with privilege 15 and strong secret.")
+                           
+def run_cis_cisco_ios_17_assessment(config_content: str) -> List[Finding]:
+    """Runs all registered IOS XE 17 checks."""
     findings = []
     normalized_config = config_content.lower().replace('\r\n', '\n').replace('\r', '\n')
     
