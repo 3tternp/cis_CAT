@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cisco CIS Audit Report - ONYX CAAAT</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+        .container { width: 90%; max-width: 1200px; margin: 40px auto; background-color: #fff; padding: 30px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); }
+        h1 { color: #004d99; text-align: center; border-bottom: 3px solid #004d99; padding-bottom: 15px; margin-bottom: 20px; }
+        h2 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-top: 30px; }
+        .summary-info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 1em; color: #555; }
+        .summary-charts { display: flex; justify-content: space-around; align-items: center; margin-top: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+        .chart-box { width: 300px; text-align: center; }
+        .score-box { background-color: #004d99; color: white; padding: 15px 30px; border-radius: 5px; font-size: 1.2em; font-weight: bold; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top;}
+        th { background-color: #004d99; color: white; font-weight: bold; font-size: 0.9em; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        /* --- Risk Color Coding --- */
+        .risk-Critical { background-color: #fce4e4; color: #c00; font-weight: bold; }
+        .risk-High { background-color: #fff3e0; color: #ff9800; font-weight: bold; }
+        .risk-Medium { background-color: #fffde7; color: #ffc107; }
+        .risk-Low { background-color: #e8f5e9; color: #4caf50; }
+        .status-Fail { color: red; font-weight: bold; }
+        .status-Manual { color: orange; font-weight: bold; }
+        .status-Pass { color: green; }
+
+        .remediation { font-style: italic; color: #666; margin-top: 5px; border-top: 1px dashed #eee; padding-top: 5px; font-size: 0.9em; }
+        .no-findings { padding: 15px; background-color: #e8f5e9; color: #2e7d32; border-left: 5px solid #4caf50; font-weight: bold; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cisco Configuration Audit Report - ONYX CAAAT</h1>
+
+        <div class="summary-info">
+            <span><strong>Configuration File:</strong> {{ filename }}</span>
+            <span><strong>Audit Benchmark:</strong> {{ audit_version }}</span>
+            <span><strong>Review Date:</strong> {{ review_date }}</span>
+        </div>
+        
+        <h2>Assessment Summary</h2>
+        <div class="summary-charts">
+            <div class="chart-box">
+                <h3>Findings by Status</h3>
+                <canvas id="statusChart"></canvas>
+            </div>
+            
+            <div class="score-box">
+                COMPLIANCE SCORE<br>
+                <span style="font-size: 2.5em;">{{ score }}</span> / 100
+            </div>
+
+            <div class="chart-box">
+                <h3>Findings by Risk Level</h3>
+                <canvas id="riskChart"></canvas>
+            </div>
+        </div>
+
+        <h2>Detailed Findings ({{ findings | length }} Issues Found)</h2>
+        {% if findings %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">CIS ID</th>
+                        <th style="width: 60px;">Level</th>
+                        <th style="width: 80px;">Status</th>
+                        <th style="width: 80px;">Risk</th>
+                        <th>Issue, Description, and Remediation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for finding in findings %}
+                        <tr>
+                            <td>{{ finding.cis_id }}</td>
+                            <td>L{{ finding.level }}</td>
+                            <td class="status-{{ finding.status }}">{{ finding.status }}</td>
+                            <td class="risk-{{ finding.risk }}">{{ finding.risk }}</td>
+                            <td>
+                                <strong>{{ finding.issue }}</strong><br>
+                                {{ finding.description }}
+                                <div class="remediation">
+                                    <strong>Remediation:</strong> {{ finding.remediation }}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="no-findings">
+                🎉 Congratulations! No findings were automatically detected by the current checks.
+            </div>
+        {% endif %}
+
+        <p style="text-align: center; margin-top: 50px; font-size: 0.8em; color: #999;">
+            This tool provides automated detection of CIS benchmark deviations. A comprehensive, manual security review is still highly recommended to confirm findings and assess custom security requirements.
+        </p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusCounts = {{ status_counts | tojson }};
+            const riskCounts = {{ risk_counts | tojson }};
+
+            // --- Status Chart (Doughnut) ---
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Fail', 'Manual', 'Pass'],
+                    datasets: [{
+                        data: [statusCounts.Fail, statusCounts.Manual, statusCounts.Pass],
+                        backgroundColor: [
+                            '#c00',    /* Red for Fail */
+                            '#ff9800', /* Orange for Manual */
+                            '#4caf50'  /* Green for Pass */
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            // --- Risk Chart (Bar) ---
+            const riskLabels = ['Critical', 'High', 'Medium', 'Low'];
+            const riskData = [riskCounts.Critical, riskCounts.High, riskCounts.Medium, riskCounts.Low];
+            
+            const riskCtx = document.getElementById('riskChart').getContext('2d');
+            new Chart(riskCtx, {
+                type: 'bar',
+                data: {
+                    labels: riskLabels,
+                    datasets: [{
+                        label: 'Number of Findings',
+                        data: riskData,
+                        backgroundColor: [
+                            '#c00',    /* Critical: Deep Red */
+                            '#ff9800', /* High: Deep Orange */
+                            '#ffc107', /* Medium: Yellow */
+                            '#4caf50'  /* Low: Green */
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
